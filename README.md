@@ -1,5 +1,5 @@
 # papers.sh
-A small web app that pulls the latest AI/ML papers from arXiv and gives quick summaries using different LLM providers. Basically turns long abstracts into something you can scan in seconds. Not fancy, just useful.
+A small web app that pulls the latest AI/ML papers from arXiv and gives quick summaries using different LLM providers. Basically turns long abstracts into something you can scan in seconds.
 
 ## Features
 - Browse papers by topic (AI, ML, CV, NLP, etc.)
