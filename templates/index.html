@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Papers.sh</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0d0d0f;
+      --card: #16161a;
+      --border: #2a2a30;
+      --accent: #3edbf0;
+      --text: #ffffff;
+      --muted: #bfbfbf;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      padding: 20px 30px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .logo span { color: var(--accent); }
+
+    aside {
+      border-right: 1px solid var(--border);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .label {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+
+    select, input, button {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+    }
+
+    button {
+      background: var(--accent);
+      color: #000;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .topics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .topic {
+      padding: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .topic.active {
+      background: var(--accent);
+      color: #000;
+    }
+
+    main {
+      padding: 30px;
+    }
+
+    .card {
+      background: var(--card);
+      padding: 22px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    h2 {
+      margin-bottom: 8px;
+    }
+
+    .authors {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 18px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .summary-box {
+      padding: 12px;
+      background: #111;
+      border-left: 3px solid var(--accent);
+      font-size: 14px;
+    }
+
+    .loading {
+      color: var(--muted);
+      font-style: italic;
+      font-size: 14px;
+    }
+
+    .abstract {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .nav {
+      margin-top: 18px;
+      display: flex;
+      gap: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <div class="logo">Papers<span>.sh</span></div>
+</header>
+
+<aside>
+
+  <div>
+    <div class="label">Provider</div>
+    <select id="providerSelect">
+      {% for pid, cfg in providers.items() %}
+      <option value="{{ pid }}">{{ cfg.label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div>
+    <div class="label">Topic</div>
+    <div class="topics" id="topicGrid">
+      {% for code, label in topics.items() %}
+      <button class="topic {% if loop.first %}active{% endif %}" data-code="{{ code }}">
+        {{ label }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div>
+    <div class="label">Number of Papers</div>
+    <input type="range" id="nSlider" min="5" max="20" value="10">
+    <div id="sliderVal">10</div>
+  </div>
+
+  <button id="fetchBtn">Fetch Papers</button>
+
+</aside>
+
+<main id="main">
+  <p>Select a topic and fetch papers.</p>
+</main>
+
+<script>
+let papers = [];
+let index = 0;
+let cache = {};
+
+let activeTopic = '{{ topics|list|first }}';
+
+const main = document.getElementById('main');
+const provider = document.getElementById('providerSelect');
+
+document.getElementById('topicGrid').addEventListener('click', e => {
+  const btn = e.target.closest('.topic');
+  if (!btn) return;
+
+  document.querySelectorAll('.topic').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeTopic = btn.dataset.code;
+});
+
+
+document.getElementById('nSlider').addEventListener('input', e => {
+  document.getElementById('sliderVal').textContent = e.target.value;
+});
+
+
+document.getElementById('fetchBtn').addEventListener('click', async () => {
+  main.innerHTML = "Loading...";
+
+  const res = await fetch(`/api/papers?topic=${activeTopic}&n=${document.getElementById('nSlider').value}`);
+  const data = await res.json();
+
+  if (!data.ok) {
+    main.innerHTML = "Error: " + data.error;
+    return;
+  }
+
+  papers = data.papers;
+  index = 0;
+  cache = {};
+  render();
+});
+
+function render() {
+  if (!papers.length) return;
+
+  const p = papers[index];
+  const key = provider.value + "::" + p.link;
+  const hasSummary = key in cache;
+
+  main.innerHTML = `
+    <div class="card">
+      <h2>${p.title}</h2>
+      <div class="authors">${p.authors.join(', ')}</div>
+
+      <div class="section-title">Summary</div>
+      ${
+        hasSummary
+        ? `<div class="summary-box">${cache[key]}</div>`
+        : `<div class="loading">Generating summary...</div>`
+      }
+
+      <div class="section-title">Abstract</div>
+      <div class="abstract">${p.abstract}</div>
+
+      <div class="nav">
+        <button onclick="prev()">Prev</button>
+        <button onclick="next()">Next</button>
+      </div>
+    </div>
+  `;
+
+  if (!hasSummary) fetchSummary(p, key);
+}
+
+async function fetchSummary(p, key) {
+  const res = await fetch('/api/summarize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      provider: provider.value,
+      title: p.title,
+      abstract: p.abstract
+    })
+  });
+
+  const data = await res.json();
+  if (!data.ok) return;
+
+  cache[key] = data.summary;
+  render();
+}
+
+function next() {
+  if (index < papers.length - 1) {
+    index++;
+    render();
+  }
+}
+
+function prev() {
+  if (index > 0) {
+    index--;
+    render();
+  }
+}
+</script>
+</body>
+</html>
